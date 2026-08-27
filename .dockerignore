@@ -1,0 +1,16 @@
+.git
+.venv
+backend/venv
+backend/Temp
+node_modules
+frontend/node_modules
+frontend/dist
+browser-data
+*.tar.gz
+*.sqlite
+*.sqlite3
+database.sqlite.backup
+exports
+data
+__pycache__
+*.pyc

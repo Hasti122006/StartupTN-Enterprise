@@ -1,0 +1,12 @@
+.git
+.venv
+backend/venv
+node_modules
+frontend/node_modules
+browser-data
+.runtime
+*.tar.gz
+*.sqlite
+database.sqlite.backup
+exports
+data

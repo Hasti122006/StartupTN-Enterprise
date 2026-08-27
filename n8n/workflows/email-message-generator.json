@@ -1,0 +1,227 @@
+{
+  "name": "Email Message Generator Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-emails",
+        "options": {}
+      },
+      "id": "e6a4b11f-c02c-473d-8ab1-ffb2cb9e8fb2",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=http://127.0.0.1:8000/api/marketing/campaigns/{{ $json.body.campaign_id }}/",
+        "options": {}
+      },
+      "id": "e932b11f-d23c-482d-9ba2-ffb1cb9e9ac3",
+      "name": "Get Campaign Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:8000/api/companies/",
+        "sendQueryParameters": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "page_size",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e932b11f-d23c-482d-9ba2-ffb1cb9e9ac4",
+      "name": "Get Companies List",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\nconst companies = items[0].json.items || [];\nconst campaign = $node[\"Get Campaign Details\"].json;\n\n// Filter companies based on campaign targeting\nconst filtered = companies.filter(c => {\n  if (!c.email) return false;\n  if (campaign.target_sector && c.sector && !c.sector.toLowerCase().includes(campaign.target_sector.toLowerCase())) return false;\n  if (campaign.target_stage && c.current_stage && c.current_stage.toLowerCase() !== campaign.target_stage.toLowerCase()) return false;\n  if (campaign.target_location && c.location && !c.location.toLowerCase().includes(campaign.target_location.toLowerCase())) return false;\n  return true;\n});\n\nreturn filtered.map(c => ({ json: c }));"
+      },
+      "id": "e932b11f-f13c-493c-9ba2-ffb1cb9e9ac5",
+      "name": "Filter Targeted Companies",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "a904b11f-f13c-493d-9cb1-ffb2cb9e8dc7",
+      "name": "Loop Through Companies",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const company = $json;\nconst campaign = $node[\"Get Campaign Details\"].json;\n\nconst name = company.company_name || 'there';\nconst founders = company.founders || 'Founder';\nconst sector = company.sector || 'your industry';\nconst about = company.about || company.key_highlights || 'your innovative work';\n\n// Personalize body and subject\nlet subject = campaign.subject.replace(/{company_name}/g, name).replace(/{founders}/g, founders);\nlet body = campaign.body.replace(/{company_name}/g, name).replace(/{founders}/g, founders);\n\n// Append dynamic greeting and details (AI compilation)\nbody = `Hi ${founders},\n\nI was reviewing companies in the ${sector} sector on the StartupTN portal and wanted to reach out regarding ${name}.\n\nWe love your mission: \"${about}\".\n\n${body}\n\nBest regards,\nStartupTN Team`;\n\nreturn {\n  campaign_id: campaign.id,\n  company_id: company.id,\n  email_address: company.email,\n  subject: subject,\n  body: body\n};"
+      },
+      "id": "e104b52f-d53d-493c-9fa1-ffb4cb9e8ff1",
+      "name": "Generate Email Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email_address }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "id": "3801255a-8a6c-4025-8d96-02aa41e6c0a6",
+      "name": "Send Gmail Message",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1450,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/api/marketing/deliveries/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"campaign\": {{ $node[\"Generate Email Content\"].json.campaign_id }},\n  \"company\": {{ $node[\"Generate Email Content\"].json.company_id }},\n  \"email_address\": \"{{ $node[\"Generate Email Content\"].json.email_address }}\",\n  \"status\": \"sent\",\n  \"sent_at\": \"{{ new Date().toISOString() }}\"\n}",
+        "options": {}
+      },
+      "id": "f104b62f-e63d-493c-9fb1-ffb5cb9e8ff8",
+      "name": "Create Django Delivery Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1650,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Campaign Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Campaign Details": {
+      "main": [
+        [
+          {
+            "node": "Get Companies List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Companies List": {
+      "main": [
+        [
+          {
+            "node": "Filter Targeted Companies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Targeted Companies": {
+      "main": [
+        [
+          {
+            "node": "Loop Through Companies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Through Companies": {
+      "main": [
+        [
+          {
+            "node": "Generate Email Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Email Content": {
+      "main": [
+        [
+          {
+            "node": "Send Gmail Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Gmail Message": {
+      "main": [
+        [
+          {
+            "node": "Create Django Delivery Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Django Delivery Record": {
+      "main": [
+        [
+          {
+            "node": "Loop Through Companies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "active": false,
+  "id": "email_message_generator"
+}

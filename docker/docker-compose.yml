@@ -1,0 +1,153 @@
+services:
+  # -----------------------------
+  # Redis
+  # -----------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: startuptn_redis
+    restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -----------------------------
+  # Backend API
+  # -----------------------------
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    container_name: startuptn_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_HOST: host.docker.internal
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      SECRET_KEY: ${SECRET_KEY}
+      DEBUG: ${DEBUG}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      EXPORT_PATH: /app/data/exports
+      REDIS_HOST: redis
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_DB: ${REDIS_DB}
+      N8N_WEBHOOK_URL: http://n8n:5678/webhook/startuptn/scrape
+      N8N_API_KEY: ${N8N_API_KEY}
+      N8N_API_AUTH_ENABLED: ${N8N_API_AUTH_ENABLED}
+      STARTUPTN_LOGIN_URL: ${STARTUPTN_LOGIN_URL}
+      STARTUPTN_PROFILE_URL: ${STARTUPTN_PROFILE_URL}
+      STARTUPTN_STORAGE_STATE: /runtime/startuptn-auth-state.json
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ../.runtime:/runtime
+      - ../backend/data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # -----------------------------
+  # Playwright Scraper
+  # -----------------------------
+  scraper:
+    build:
+      context: ..
+      dockerfile: docker/scraper.Dockerfile
+    container_name: startuptn_scraper
+    restart: always
+    environment:
+      DJANGO_API: http://backend:8000
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_HOST: host.docker.internal
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      SCRAPER_BASE_URL: ${SCRAPER_BASE_URL}
+      STARTUPTN_LOGIN_URL: ${STARTUPTN_LOGIN_URL}
+      STARTUPTN_USERNAME: ${STARTUPTN_USERNAME}
+      STARTUPTN_PASSWORD: ${STARTUPTN_PASSWORD}
+      STARTUPTN_AUTH_TIMEOUT: ${STARTUPTN_AUTH_TIMEOUT}
+      STARTUPTN_PROFILE_URL: ${STARTUPTN_PROFILE_URL}
+      STARTUPTN_STORAGE_STATE: /runtime/startuptn-auth-state.json
+      PLAYWRIGHT_USER_DATA_DIR: /app/browser-data
+      SCRAPER_WORKERS: ${SCRAPER_WORKERS}
+      SCRAPER_DELAY_MIN: ${SCRAPER_DELAY_MIN}
+      SCRAPER_DELAY_MAX: ${SCRAPER_DELAY_MAX}
+      SCRAPER_RETRY_COUNT: ${SCRAPER_RETRY_COUNT}
+      SCRAPER_TIMEOUT: ${SCRAPER_TIMEOUT}
+      SCRAPER_HEADLESS: ${SCRAPER_HEADLESS}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ../backend/scraper:/app
+      - scraper_browser_data:/app/browser-data
+      - ../.runtime:/runtime
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
+  # -----------------------------
+  # n8n
+  # -----------------------------
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: startuptn_n8n
+    restart: always
+    ports:
+      - "8088:5678"
+    environment:
+      TZ: Asia/Kolkata
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      N8N_EDITOR_BASE_URL: http://localhost:8088
+      N8N_API_KEY: ${N8N_API_KEY:-}
+      N8N_API_TOKEN: ${N8N_API_KEY:-startuptn-secret-key-2026}
+      N8N_API_AUTH_ENABLED: "true"
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      DJANGO_API_URL: http://backend:8000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ../n8n:/workflows:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # -----------------------------
+  # Frontend
+  # -----------------------------
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+    container_name: startuptn_frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_started
+
+volumes:
+  redis_data:
+  n8n_data:
+  scraper_browser_data:

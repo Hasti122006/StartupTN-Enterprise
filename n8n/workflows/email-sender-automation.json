@@ -1,0 +1,165 @@
+{
+  "name": "Email Sender Automation Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-pending-emails",
+        "options": {}
+      },
+      "id": "e6a4b11f-c02c-473d-8ab1-ffb2cb9e8fb3",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:8000/api/marketing/deliveries/?status=pending",
+        "options": {}
+      },
+      "id": "e932b11f-d23c-482d-9ba2-ffb1cb9e9ac6",
+      "name": "Get Pending Deliveries",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\n// If n8n returns paginated results, extract results array, else return the root list\nconst deliveries = items[0].json.results || items[0].json.items || items[0].json || [];\nreturn Array.isArray(deliveries) ? deliveries.map(d => ({ json: d })) : [];"
+      },
+      "id": "e932b11f-f13c-493c-9ba2-ffb1cb9e9ac7",
+      "name": "Extract Deliveries List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "a904b11f-f13c-493d-9cb1-ffb2cb9e8dc8",
+      "name": "Loop Through Deliveries",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// MOCK SMTP / GMAIL SENDER\n// Replace this node with a real n8n SMTP or Gmail node in production!\nconst delivery = $json;\n\nconsole.log(`[MOCK EMAIL] Sending email to ${delivery.email_address}...`);\nconsole.log(`[MOCK EMAIL] Subject: ${delivery.campaign_subject || 'Outreach'}`);\n\n// Simulate successful sending\nreturn {\n  delivery_id: delivery.id,\n  email_address: delivery.email_address,\n  status: 'sent',\n  sent_at: new Date().toISOString()\n};"
+      },
+      "id": "e104b52f-d53d-493c-9fa1-ffb4cb9e8ff2",
+      "name": "Mock Email Sender",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://127.0.0.1:8000/api/marketing/deliveries/{{ $json.delivery_id }}/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"{{ $json.status }}\",\n  \"sent_at\": \"{{ $json.sent_at }}\"\n}",
+        "options": {}
+      },
+      "id": "f104b62f-e63d-493c-9fb1-ffb5cb9e8ff9",
+      "name": "Update Delivery Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1250,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Deliveries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Deliveries": {
+      "main": [
+        [
+          {
+            "node": "Extract Deliveries List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Deliveries List": {
+      "main": [
+        [
+          {
+            "node": "Loop Through Deliveries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Through Deliveries": {
+      "main": [
+        [
+          {
+            "node": "Mock Email Sender",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Email Sender": {
+      "main": [
+        [
+          {
+            "node": "Update Delivery Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Delivery Status": {
+      "main": [
+        [
+          {
+            "node": "Loop Through Deliveries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "active": false,
+  "id": "email_sender_automation"
+}

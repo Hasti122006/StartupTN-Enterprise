@@ -1,0 +1,260 @@
+{
+  "name": "Company Enrichment Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "enrich-companies",
+        "options": {}
+      },
+      "id": "e6a4b11f-c02c-473d-8ab1-ffb2cb9e8fb1",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:8000/api/companies/",
+        "sendQueryParameters": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "page_size",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e932b11f-d23c-482d-9ba2-ffb1cb9e9ac2",
+      "name": "Get Unprocessed Companies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\nconst companies = items[0].json.items || [];\nreturn companies.map(item => ({ json: item }));"
+      },
+      "id": "e932b11f-f13c-493c-9ba2-ffb1cb9e9ac9",
+      "name": "Extract Company List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "a904b11f-f13c-493d-9cb1-ffb2cb9e9dc4",
+      "name": "Loop Through Companies",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://html.duckduckgo.com/html/",
+        "responseFormat": "text",
+        "sendQueryParameters": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $node[\"Loop Through Companies\"].json[\"company_name\"] }} official website"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b304b22f-a23d-493c-9da1-ffb1cb9e8fb9",
+      "name": "Search Google/Web",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        900,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const rawBody = $json.body || $json.data || (typeof $json === 'string' ? $json : '');\nconst html = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody || '');\n\n// 1. Find all matches of uddg=... URL-encoded links from DuckDuckGo\nconst uddgRegex = /uddg=([^&\"']+)/g;\nconst matches = [];\nlet match;\nwhile ((match = uddgRegex.exec(html)) !== null) {\n  try {\n    const decodedUrl = decodeURIComponent(match[1]);\n    matches.push(decodedUrl);\n  } catch (e) {}\n}\n\n// 2. Extract Candidate Website link (first link not duckduckgo, google, linkedin, social networks, etc)\nconst candidateWebsite = matches.find(url => \n  !url.includes('google.com') && \n  !url.includes('gstatic.com') && \n  !url.includes('linkedin.com') && \n  !url.includes('duckduckgo.com') &&\n  !url.includes('w3.org') &&\n  !url.includes('facebook.com') &&\n  !url.includes('instagram.com') &&\n  !url.includes('twitter.com')\n) || '';\n\n// 3. Extract Candidate LinkedIn link\nconst linkedinUrl = matches.find(url => url.includes('linkedin.com/company/')) || '';\n\nreturn {\n  company_name: $node[\"Loop Through Companies\"].json[\"company_name\"],\n  candidate_website: candidateWebsite || '',\n  candidate_linkedin: linkedinUrl || ''\n};"
+      },
+      "id": "c104b32f-b33d-493c-8da1-ffb2cb9e8fc1",
+      "name": "Find Candidate Sites",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json[\"candidate_website\"] || 'https://example.com' }}",
+        "responseFormat": "text",
+        "options": {}
+      },
+      "id": "d104b42f-c43d-493c-9ea1-ffb3cb9e8fd2",
+      "name": "Visit Official Website",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1340,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const website = $node[\"Find Candidate Sites\"].json[\"candidate_website\"];\nconst linkedin = $node[\"Find Candidate Sites\"].json[\"candidate_linkedin\"];\n\nif (!website) {\n  return {\n    website: null,\n    linkedin: linkedin || null,\n    phone: null,\n    email: null,\n    confidence_score: 0,\n    enrichment_status: 'failed'\n  };\n}\n\nconst html = $json.body || '';\n\n// 1. Regex for finding phone numbers\nconst phoneRegex = /(\\+?\\d{1,4}[\\s-]?)?(\\(?\\d{3}\\)?[\\s-]?)?\\d{3}[\\s-]?\\d{4}/g;\nconst phoneMatches = html.match(phoneRegex) || [];\nconst cleanPhones = [...new Set(phoneMatches.map(p => p.trim()))].filter(p => p.length >= 7);\n\n// 2. Regex for finding email addresses\nconst emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/g;\nconst emailMatches = html.match(emailRegex) || [];\nconst cleanEmails = [...new Set(emailMatches.map(e => e.trim()))];\n\n// Calculate confidence score based on company name presence\nconst companyName = $node[\"Find Candidate Sites\"].json[\"company_name\"].toLowerCase();\nconst containsName = html.toLowerCase().includes(companyName);\nconst confidence = containsName ? 0.95 : 0.60;\n\nreturn {\n  website: website,\n  linkedin: linkedin || null,\n  phone: cleanPhones.length > 0 ? cleanPhones[0] : null,\n  email: cleanEmails.length > 0 ? cleanEmails[0] : null,\n  confidence_score: confidence,\n  enrichment_status: 'completed'\n};"
+      },
+      "id": "e104b52f-d53d-493c-9fa1-ffb4cb9e8fe3",
+      "name": "Extract Phones & Confidence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://127.0.0.1:8000/api/companies/{{ $node[\"Loop Through Companies\"].json[\"id\"] }}/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"website\": \"{{ $json[\"website\"] }}\",\n  \"linkedin\": \"{{ $json[\"linkedin\"] }}\",\n  \"phone\": \"{{ $json[\"phone\"] }}\",\n  \"email\": \"{{ $json[\"email\"] }}\"\n}",
+        "options": {}
+      },
+      "id": "f104b62f-e63d-493c-9fb1-ffb5cb9e8ff4",
+      "name": "Update Existing Company",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1780,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Unprocessed Companies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Unprocessed Companies": {
+      "main": [
+        [
+          {
+            "node": "Extract Company List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Company List": {
+      "main": [
+        [
+          {
+            "node": "Loop Through Companies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Through Companies": {
+      "main": [
+        [
+          {
+            "node": "Search Google/Web",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Google/Web": {
+      "main": [
+        [
+          {
+            "node": "Find Candidate Sites",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Candidate Sites": {
+      "main": [
+        [
+          {
+            "node": "Visit Official Website",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Visit Official Website": {
+      "main": [
+        [
+          {
+            "node": "Extract Phones & Confidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Phones & Confidence": {
+      "main": [
+        [
+          {
+            "node": "Update Existing Company",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Existing Company": {
+      "main": [
+        [
+          {
+            "node": "Loop Through Companies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "active": false,
+  "id": "company_enrichment_workflow"
+}
