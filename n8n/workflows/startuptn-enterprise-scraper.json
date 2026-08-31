@@ -1,18 +1,167 @@
 {
-  "name": "My workflow",
-  "nodes": [],
-  "pinData": {},
-  "connections": {},
-  "active": false,
+  "name": "StartupTN Enterprise Scraper - n8n AI Scraper Pipeline",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Schedule Daily (00:00 UTC)",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        160
+      ],
+      "id": "be2c7b7d-ac64-44d2-819d-4110d825cb5b"
+    },
+    {
+      "parameters": {},
+      "name": "Schedule Weekly (Sun 00:00)",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        368
+      ],
+      "id": "0ed7d319-65e4-49fd-a9e0-e7153447f639"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "startuptn/scrape",
+        "options": {}
+      },
+      "name": "Webhook Start Scraper",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        560
+      ],
+      "webhookId": "b96c4633-b083-49a3-a773-84450e6d0559",
+      "id": "498bd76e-12e9-4e45-86df-e4f26313a3e9"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.item.json.body || $input.item.json || {};\nconst jobId = body.job_id || ($('Webhook Start Scraper').item && $('Webhook Start Scraper').item.json.body && $('Webhook Start Scraper').item.json.body.job_id) || 'job-' + Date.now();\nconst adminPrompt = body.prompt || 'Find Tamil Nadu startups and technology companies.';\nconst location = body.location || 'Tamil Nadu';\nconst sector = body.sector || '';\nconst maxResults = body.max_results || 10;\nconst companies = body.companies || [];\n\nreturn [{\n  json: {\n    job_id: String(jobId),\n    prompt: adminPrompt,\n    location: location,\n    sector: sector,\n    max_results: maxResults,\n    source: body.source || 'startuptn',\n    companies: Array.isArray(companies) ? companies : []\n  }\n}];"
+      },
+      "name": "Construct Scraping Instructions & AI Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        560
+      ],
+      "id": "0a6e23d0-90f2-44ac-91ca-041128c0dd72"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputData = $input.item.json;\nconst webhookBody = ($('Webhook Start Scraper').item && $('Webhook Start Scraper').item.json.body) || {};\nconst promptNode = ($('Construct Scraping Instructions & AI Prompt').item && $('Construct Scraping Instructions & AI Prompt').item.json) || {};\n\nconst jobId = inputData.job_id || promptNode.job_id || webhookBody.job_id || 'job-' + Date.now();\nlet companies = inputData.companies || promptNode.companies || webhookBody.companies || [];\n\nreturn [{\n  json: {\n    job_id: String(jobId),\n    companies: Array.isArray(companies) ? companies : [],\n    is_start_trigger: !Array.isArray(companies) || companies.length === 0\n  }\n}];"
+      },
+      "name": "Execute AI Scraper & Extract Company Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        560
+      ],
+      "id": "6f97c747-a60e-44bf-9557-e475283362ee"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputData = $input.item.json;\nconst webhookBody = ($('Webhook Start Scraper').item && $('Webhook Start Scraper').item.json.body) || {};\nconst promptNode = ($('Construct Scraping Instructions & AI Prompt').item && $('Construct Scraping Instructions & AI Prompt').item.json) || {};\nconst scraperNode = ($('Execute AI Scraper & Extract Company Data').item && $('Execute AI Scraper & Extract Company Data').item.json) || {};\n\nconst rawJobId = inputData.job_id || scraperNode.job_id || promptNode.job_id || webhookBody.job_id;\n\nif (!rawJobId) {\n  throw new Error(\"Validation Error: Missing job_id across all upstream nodes (Webhook, Prompt Construction, AI Scraper).\");\n}\n\nlet jobId = Number(rawJobId);\nif (isNaN(jobId)) {\n  jobId = rawJobId;\n}\n\nconst rawCompanies = inputData.companies || scraperNode.companies || promptNode.companies || webhookBody.companies || [];\n\nif (!Array.isArray(rawCompanies)) {\n  throw new Error(\"Validation Error: companies field must be an array.\");\n}\n\nreturn [{\n  json: {\n    job_id: jobId,\n    companies: rawCompanies,\n    is_final: inputData.is_final !== undefined ? Boolean(inputData.is_final) : (webhookBody.is_final !== undefined ? Boolean(webhookBody.is_final) : false),\n    n8n_execution_id: $execution.id,\n    n8n_workflow_id: $workflow.id,\n    api_token: $env.N8N_API_TOKEN || $env.N8N_API_KEY || 'startuptn-secret-key-2026'\n  }\n}];"
+      },
+      "name": "Validate & Prepare Ingestion Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        560
+      ],
+      "id": "5032c761-ef1c-47a6-91f8-b269ec926c00"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DJANGO_API_URL || \"http://backend:8000\" }}/scraper/n8n/results/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ \"Bearer \" + $json.api_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { job_id: $json.job_id, n8n_execution_id: $json.n8n_execution_id, n8n_workflow_id: $json.n8n_workflow_id, companies: $json.companies, is_final: $json.is_final } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Send Structured Data To Django Ingestion API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        656,
+        560
+      ],
+      "id": "c9a21791-6228-4624-8307-dccc3684b5e9"
+    }
+  ],
+  "connections": {
+    "Webhook Start Scraper": {
+      "main": [
+        [
+          {
+            "node": "Construct Scraping Instructions & AI Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construct Scraping Instructions & AI Prompt": {
+      "main": [
+        [
+          {
+            "node": "Execute AI Scraper & Extract Company Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute AI Scraper & Extract Company Data": {
+      "main": [
+        [
+          {
+            "node": "Validate & Prepare Ingestion Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Prepare Ingestion Payload": {
+      "main": [
+        [
+          {
+            "node": "Send Structured Data To Django Ingestion API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "availableInMCP": false
   },
-  "versionId": "",
-  "meta": {
-    "instanceId": "64d0bb2da8b42c753aefdf7552447dc3774b88adb5e615bd8bb34c934a21305f"
-  },
-  "nodeGroups": [],
-  "id": "R0esjlEHbFjf2hIe",
+  "versionId": "b69a4b0d-bb05-48c9-8d3b-329aef05fa56",
+  "meta": {},
+  "id": "qTCiueFBtkhFKP4s",
   "tags": []
 }
