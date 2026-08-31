@@ -1,5 +1,5 @@
 {
-  "name": "Company Enrichment Workflow",
+  "name": "Company Enrichment Workflow (AI-Powered)",
   "nodes": [
     {
       "parameters": {
@@ -119,7 +119,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const rawBody = $json.body || $json.data || (typeof $json === 'string' ? $json : '');\nconst html = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody || '');\n\nconst matches = [];\nconst hrefRegex = /href=[\"'](https?:\\/\\/[^\"']+)[\"']/g;\nlet match;\nwhile ((match = hrefRegex.exec(html)) !== null) {\n  let url = match[1];\n  if (url.includes('uddg=')) {\n    try {\n      const uddgMatch = url.match(/uddg=([^&]+)/);\n      if (uddgMatch) {\n        url = decodeURIComponent(uddgMatch[1]);\n      }\n    } catch (e) {}\n  }\n  matches.push(url);\n}\n\n// 2. Filter out non-official domains (directories, search engines, socials)\nconst blacklist = [\n  'google.', 'gstatic.', 'linkedin.', 'duckduckgo.', 'w3.org', \n  'facebook.', 'instagram.', 'twitter.', 'x.com', 'pinterest.',\n  'zaubacorp.', 'thecompanycheck.', 'companydetails.', 'falconebiz.',\n  'indiamart.', 'justdial.', 'tofler.', 'tradeindia.', 'startupindia.',\n  'startuptn.', 'mca.gov.', 'glassdoor.', 'ambitionbox.', 'crunchbase.',\n  'tracxn.', 'wikipedia.', 'indiahix.', 'lusha.', 'apollo.io',\n  'zoominfo.', 'quickr.', 'sulekha.', 'yellowpages.'\n];\n\nconst candidateWebsite = matches.find(url => {\n  const lowercaseUrl = url.toLowerCase();\n  return !blacklist.some(domain => lowercaseUrl.includes(domain));\n}) || '';\n\n// 3. Extract Candidate LinkedIn link\nconst linkedinUrl = matches.find(url => url.includes('linkedin.com/company/')) || '';\n\nreturn {\n  company_name: $node[\"Loop Through Companies\"].json[\"company_name\"],\n  candidate_website: candidateWebsite || '',\n  candidate_linkedin: linkedinUrl || ''\n};"
+        "jsCode": "const rawBody = $json.body || $json.data || (typeof $json === 'string' ? $json : '');\nconst html = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody || '');\n\nconst matches = [];\nconst hrefRegex = /href=[\"'](https?:\\/\\/[^\"']+)[\"']/g;\nlet match;\nwhile ((match = hrefRegex.exec(html)) !== null) {\n  let url = match[1];\n  if (url.includes('uddg=')) {\n    try {\n      const uddgMatch = url.match(/uddg=([^&]+)/);\n      if (uddgMatch) {\n        url = decodeURIComponent(uddgMatch[1]);\n      }\n    } catch (e) {}\n  }\n  matches.push(url);\n}\n\nconst blacklist = [\n  'google.', 'gstatic.', 'linkedin.', 'duckduckgo.', 'w3.org', \n  'facebook.', 'instagram.', 'twitter.', 'x.com', 'pinterest.',\n  'zaubacorp.', 'thecompanycheck.', 'companydetails.', 'falconebiz.',\n  'indiamart.', 'justdial.', 'tofler.', 'tradeindia.', 'startupindia.',\n  'startuptn.', 'mca.gov.', 'glassdoor.', 'ambitionbox.', 'crunchbase.',\n  'tracxn.', 'wikipedia.', 'indiahix.', 'lusha.', 'apollo.io',\n  'zoominfo.', 'quickr.', 'sulekha.', 'yellowpages.'\n];\n\nconst candidateWebsite = matches.find(url => {\n  const lowercaseUrl = url.toLowerCase();\n  return !blacklist.some(domain => lowercaseUrl.includes(domain));\n}) || '';\n\nconst linkedinUrl = matches.find(url => url.includes('linkedin.com/company/')) || '';\n\nreturn {\n  company_name: $node[\"Loop Through Companies\"].json[\"company_name\"],\n  candidate_website: candidateWebsite || '',\n  candidate_linkedin: linkedinUrl || ''\n};"
       },
       "id": "c104b32f-b33d-493c-8da1-ffb2cb9e8fc1",
       "name": "Find Candidate Sites",
@@ -150,7 +150,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const html = $json.body || '';\nconst website = $json.candidate_website || '';\nlet contactUrl = null;\n\nif (website && html) {\n  const hrefRegex = /href=[\"'](https?:\\/\\/[^\"']+)[\"']/g;\n  let match;\n  const hrefs = [];\n  while ((match = hrefRegex.exec(html)) !== null) {\n    hrefs.push(match[1]);\n  }\n  \n  const contactHref = hrefs.find(h => h.toLowerCase().includes('contact'));\n  \n  if (contactHref) {\n    try {\n      if (contactHref.startsWith('/') || !contactHref.startsWith('http')) {\n        const base = new URL(website);\n        contactUrl = new URL(contactHref, base.origin).href;\n      } else {\n        contactUrl = contactHref;\n      }\n    } catch (e) {}\n  }\n}\n\nreturn {\n  company_name: $json.company_name,\n  candidate_website: website,\n  candidate_linkedin: $json.candidate_linkedin,\n  homepage_html: html,\n  contact_page_url: contactUrl\n};"
+        "jsCode": "const html = $json.body || '';\nconst website = $json.candidate_website || '';\nlet contactUrl = null;\n\nif (website && html) {\n  const hrefRegex = /href=[\"'](https?:\\/\\/[^\"']+)[\"']/g;\n  let match;\n  const hrefs = [];\n  while ((match = hrefRegex.exec(html)) !== null) {\n    hrefs.push(match[1]);\n  }\n  \n  const contactHref = hrefs.find(h => h.toLowerCase().includes('contact'));\n  \n  if (contactHref) {\n    try {\n      if (contactHref.startsWith('/') || !contactHref.startsWith('http')) {\n        const base = new URL(website);\n        contactUrl = new URL(contactHref, base.origin).href;\n      } else {\n        contactUrl = contactHref;\n      }\n    } catch (e) {} \n  }\n}\n\nreturn {\n  company_name: $json.company_name,\n  candidate_website: website,\n  candidate_linkedin: $json.candidate_linkedin,\n  homepage_html: html,\n  contact_page_url: contactUrl\n};"
       },
       "id": "e104b52f-d53d-493c-9fa1-ffb2cb9e8fe8",
       "name": "Extract Contact Us Link",
@@ -211,15 +211,52 @@
     },
     {
       "parameters": {
+        "promptType": "define",
+        "text": "=You are an expert data scraper. Read the following combined HTML sources from the official website, contact page, and LinkedIn page for the company '{{ $json.company_name }}'.\n\nExtract and return the following fields:\n1. 'website': The company's main official website URL.\n2. 'email': The official contact or support email.\n3. 'phone': The main contact phone number in clean format (e.g. +91 44 1234 5678).\n4. 'linkedin': The company's official LinkedIn page.\n\nCombined HTML Data:\n--- Homepage HTML ---\n{{ $json.homepage_html }}\n\n--- Contact Page HTML ---\n{{ $json.contact_html }}\n\n--- LinkedIn HTML ---\n{{ $json.body }}\n\nReturn the output STRICTLY as a valid JSON object matching this schema:\n{\n  \"website\": \"string or null\",\n  \"email\": \"string or null\",\n  \"phone\": \"string or null\",\n  \"linkedin\": \"string or null\"\n}",
+        "options": {}
+      },
+      "id": "b404b52f-d53d-493c-9fa1-ffb2cb9e8fe1",
+      "name": "AI Details Extractor",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        1950,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "gemini-1.5-flash",
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "id": "c404b52f-d53d-493c-9fa1-ffb2cb9e8fe2",
+      "name": "Google Gemini Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1900,
+        350
+      ],
+      "credentials": {
+        "googleIdentifyOAuth2Api": {
+          "id": "new-credentials-id",
+          "field": "googleIdentifyOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const website = $json.candidate_website;\nconst linkedin = $json.candidate_linkedin;\n\nif (!website) {\n  return {\n    website: null,\n    linkedin: linkedin || null,\n    phone: null,\n    email: null,\n    confidence_score: 0,\n    enrichment_status: 'failed'\n  };\n}\n\nconst homepageHtml = $json.homepage_html || '';\nconst contactHtml = $json.contact_html || '';\nconst linkedinHtml = $json.candidate_linkedin ? ($json.body || '') : '';\nconst combinedHtml = homepageHtml + '\\n' + contactHtml + '\\n' + linkedinHtml;\n\n// 1. Regex for finding phone numbers (robust Indian mobile & landline format)\nconst phoneRegex = /(?:\\+?91[\\s-]?)?\\(?\\d{2,5}\\)?[\\s-]?\\d{3,5}[\\s-]?\\d{3,5}/g;\nconst phoneMatches = combinedHtml.match(phoneRegex) || [];\nconst cleanPhones = [...new Set(phoneMatches.map(p => p.trim()))].filter(p => p.length >= 7);\n\n// 2. Regex for finding email addresses\nconst emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/g;\nconst emailMatches = combinedHtml.match(emailRegex) || [];\nconst cleanEmails = [...new Set(emailMatches.map(e => e.trim()))];\n\n// Calculate confidence score based on company name presence\nconst companyName = $json.company_name ? $json.company_name.toLowerCase() : '';\nconst containsName = companyName ? combinedHtml.toLowerCase().includes(companyName) : false;\nconst confidence = containsName ? 0.95 : 0.60;\n\nreturn {\n  website: website,\n  linkedin: linkedin || null,\n  phone: cleanPhones.length > 0 ? cleanPhones[0] : null,\n  email: cleanEmails.length > 0 ? cleanEmails[0] : null,\n  confidence_score: confidence,\n  enrichment_status: 'completed'\n};"
+        "jsCode": "let aiResult = {};\ntry {\n  const rawText = $node[\"AI Details Extractor\"].json.text || '';\n  // Extract JSON block if the model wraps it in markdown fence block\n  const jsonMatch = rawText.match(/\\{([\\s\\S]*)\\}/);\n  if (jsonMatch) {\n    aiResult = JSON.parse(jsonMatch[0]);\n  } else {\n    aiResult = JSON.parse(rawText);\n  }\n} catch (e) {}\n\nreturn {\n  website: aiResult.website || $json.candidate_website || null,\n  linkedin: aiResult.linkedin || $json.candidate_linkedin || null,\n  phone: aiResult.phone || null,\n  email: aiResult.email || null,\n  confidence_score: aiResult.phone ? 0.95 : 0.60,\n  enrichment_status: 'completed'\n};"
       },
       "id": "e104b52f-d53d-493c-9fa1-ffb2cb9e8fe3",
-      "name": "Extract Phones & Confidence",
+      "name": "Format AI Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1950,
+        2150,
         200
       ]
     },
@@ -240,7 +277,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        2100,
+        2300,
         200
       ]
     },
@@ -258,7 +295,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        2250,
+        2450,
         200
       ]
     }
@@ -389,14 +426,36 @@
       "main": [
         [
           {
-            "node": "Extract Phones & Confidence",
+            "node": "AI Details Extractor",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Extract Phones & Confidence": {
+    "Google Gemini Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Details Extractor",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Details Extractor": {
+      "main": [
+        [
+          {
+            "node": "Format AI Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format AI Output": {
       "main": [
         [
           {
