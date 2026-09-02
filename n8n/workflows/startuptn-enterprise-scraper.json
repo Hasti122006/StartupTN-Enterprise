@@ -81,7 +81,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.DJANGO_API_URL || \"http://backend:8000\" }}/scraper/n8n/results/",
+        "url": "http://localhost:8000/scraper/n8n/results/",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
