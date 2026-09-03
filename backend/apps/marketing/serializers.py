@@ -21,6 +21,9 @@ class EmailCampaignSerializer(serializers.ModelSerializer):
 class CampaignDeliverySerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.company_name', read_only=True)
     campaign_name = serializers.CharField(source='campaign.name', read_only=True)
+    campaign_subject = serializers.CharField(source='campaign.subject', read_only=True)
+    campaign_body = serializers.CharField(source='campaign.body', read_only=True)
+    founders = serializers.CharField(source='company.founders', read_only=True)
 
     class Meta:
         model = CampaignDelivery

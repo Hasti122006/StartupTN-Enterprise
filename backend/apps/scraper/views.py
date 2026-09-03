@@ -275,9 +275,37 @@ class ScraperStartView(APIView):
         job.status = 'running'
         job.save(update_fields=['status', 'updated_at'])
 
+        # In local SQLite mode (without Docker Redis worker), spawn the Playwright scraper worker directly
+        if getattr(settings, 'USE_SQLITE', False) or os.getenv('USE_SQLITE', 'false').lower() == 'true':
+            try:
+                import subprocess
+                import sys
+                scraper_script = Path(settings.BASE_DIR).parent / "scraper" / "main.py"
+                env = os.environ.copy()
+                env["SCRAPER_JOB_ID"] = str(job.id)
+                env["USE_SQLITE"] = "true"
+                env["SCRAPER_START_PAGE"] = str(job.start_page)
+                env["SCRAPER_END_PAGE"] = str(job.end_page)
+                env["SCRAPER_COMPANY_LIMIT"] = str(job.company_limit)
+                env["SCRAPER_HEADLESS"] = str(job.headless).lower()
+                env["SCRAPER_WORKERS"] = str(job.workers)
+                storage = getattr(settings, 'STARTUPTN_STORAGE_STATE', '.runtime/startuptn-auth-state.json')
+                p = Path(storage)
+                if not p.is_absolute():
+                    p = Path(settings.BASE_DIR).parent / storage
+                env["STARTUPTN_STORAGE_STATE"] = str(p)
+                subprocess.Popen(
+                    [sys.executable, str(scraper_script)],
+                    env=env,
+                    cwd=str(Path(settings.BASE_DIR).parent / "scraper"),
+                )
+                logger.info("[SCRAPER-START] Spawned local Playwright scraper worker for Job #%s", job.id)
+            except Exception as exc:
+                logger.error("[SCRAPER-START] Failed to spawn local scraper worker: %s", exc)
+
         success, msg = trigger_n8n_scrape_job(job)
         if not success:
-            logger.warning("[SCRAPER-START] n8n trigger reported warning/error: %s (Worker is executing via Redis)", msg)
+            logger.warning("[SCRAPER-START] n8n trigger reported warning/error: %s", msg)
 
         serializer = JobSerializer(job)
         response_data = serializer.data

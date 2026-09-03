@@ -75,15 +75,25 @@ def run_campaign_sending(campaign_id):
                 subject=subject_personalized,
                 body=text_content,
                 from_email=from_email,
-                to=[email_addr]
+                to=[email_addr],
+                reply_to=[from_email],
+                headers={
+                    'X-Mailer': 'StartupTN Outreach Platform',
+                    'Precedence': 'bulk',
+                }
             )
-            msg.attach_alternative(body_personalized, "text/html")
+            if '<' in body_personalized and '>' in body_personalized:
+                msg.attach_alternative(body_personalized, "text/html")
             msg.send()
 
             delivery.status = 'sent'
             delivery.sent_at = timezone.now()
             delivery.save(update_fields=['status', 'sent_at'])
             sent_count += 1
+
+            # 1-second human delay between sends to prevent Gmail spam detection
+            import time
+            time.sleep(1.0)
         except Exception as e:
             logger.exception(f"[MARKETING] Failed to send to {email_addr} for campaign #{campaign_id}")
             delivery.status = 'failed'
@@ -128,6 +138,18 @@ def trigger_campaign_send(campaign_id):
     Triggers campaign sending asynchronously.
     Prefers Celery, but falls back to a Python background thread if Celery is unavailable.
     """
+    import os
+    if getattr(settings, 'USE_SQLITE', False) or os.getenv('USE_SQLITE', 'false').lower() == 'true':
+        thread = threading.Thread(
+            target=run_campaign_sending,
+            args=(campaign_id,),
+            name=f"CampaignSender-{campaign_id}"
+        )
+        thread.daemon = True
+        thread.start()
+        logger.info(f"[MARKETING] Dispatched campaign #{campaign_id} via local background thread")
+        return
+
     try:
         # Attempt to queue via Celery
         send_campaign_task.delay(campaign_id)

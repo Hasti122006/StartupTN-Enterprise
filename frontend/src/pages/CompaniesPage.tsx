@@ -23,6 +23,7 @@ import {
   Skeleton,
   CircularProgress,
   Alert,
+  Button,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -33,6 +34,7 @@ import {
   Phone as PhoneIcon,
   LocationOn as LocationIcon,
   Close as CloseIcon,
+  Send as SendIcon,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
@@ -50,7 +52,7 @@ export const CompaniesPage: React.FC = () => {
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
-        page_size: '15',
+        page_size: '5',
         ...(search && { search }),
         ...(sector && { sector }),
         ...(stage && { current_stage: stage }),
@@ -335,29 +337,159 @@ export const CompaniesPage: React.FC = () => {
               </Grid>
 
               <Grid item xs={12}>
-                <Divider sx={{ my: 1 }} />
-                <Typography variant="caption" color="text.secondary" gutterBottom>Links & Contact</Typography>
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
-                  {detailData.website && (
-                    <Link href={detailData.website} target="_blank" underline="hover" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <WebIcon fontSize="small" /> Website
-                    </Link>
-                  )}
-                  {detailData.linkedin && (
-                    <Link href={detailData.linkedin} target="_blank" underline="hover" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <LinkedInIcon fontSize="small" /> LinkedIn
-                    </Link>
-                  )}
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#38bdf8', mb: 2 }}>
+                  Contact Details
+                </Typography>
+
+                {/* Email */}
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 500 }}>
+                    <EmailIcon fontSize="small" sx={{ color: '#38bdf8' }} /> Email: <strong>{detailData.email || 'Not available'}</strong>
+                  </Typography>
                   {detailData.email && (
-                    <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <EmailIcon fontSize="small" /> {detailData.email}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, pl: 3.5 }}>
+                      <Chip
+                        label="Official Web ✓"
+                        size="small"
+                        sx={{
+                          bgcolor: 'rgba(56, 189, 248, 0.15)',
+                          color: '#38bdf8',
+                          fontSize: '0.75rem',
+                          height: 22,
+                          border: '1px solid rgba(56, 189, 248, 0.3)',
+                          fontWeight: 600,
+                        }}
+                      />
+                      {detailData.website && (
+                        <Link
+                          href={detailData.website}
+                          target="_blank"
+                          underline="hover"
+                          variant="caption"
+                          sx={{ color: '#38bdf8', fontWeight: 500 }}
+                        >
+                          {detailData.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                        </Link>
+                      )}
+                    </Box>
                   )}
+                </Box>
+
+                {/* Phone */}
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 500 }}>
+                    <PhoneIcon fontSize="small" sx={{ color: '#38bdf8' }} /> Phone: <strong>{detailData.phone || 'Not available'}</strong>
+                  </Typography>
                   {detailData.phone && (
-                    <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <PhoneIcon fontSize="small" /> {detailData.phone}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, pl: 3.5 }}>
+                      <Chip
+                        label="Official Web ✓"
+                        size="small"
+                        sx={{
+                          bgcolor: 'rgba(56, 189, 248, 0.15)',
+                          color: '#38bdf8',
+                          fontSize: '0.75rem',
+                          height: 22,
+                          border: '1px solid rgba(56, 189, 248, 0.3)',
+                          fontWeight: 600,
+                        }}
+                      />
+                      {detailData.website && (
+                        <Link
+                          href={detailData.website}
+                          target="_blank"
+                          underline="hover"
+                          variant="caption"
+                          sx={{ color: '#38bdf8', fontWeight: 500 }}
+                        >
+                          {detailData.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                        </Link>
+                      )}
+                    </Box>
+                  )}
+                </Box>
+
+                {/* LinkedIn */}
+                <Box sx={{ mb: 2 }}>
+                  {detailData.linkedin ? (
+                    <Box>
+                      <Link
+                        href={detailData.linkedin}
+                        target="_blank"
+                        underline="hover"
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          color: '#38bdf8',
+                          fontWeight: 600,
+                          fontSize: '0.95rem',
+                        }}
+                      >
+                        <LinkedInIcon fontSize="small" /> Open LinkedIn
+                      </Link>
+                      <Box sx={{ mt: 0.5, pl: 3.5 }}>
+                        <Chip
+                          label="Official Web ✓"
+                          size="small"
+                          sx={{
+                            bgcolor: 'rgba(56, 189, 248, 0.15)',
+                            color: '#38bdf8',
+                            fontSize: '0.75rem',
+                            height: 22,
+                            border: '1px solid rgba(56, 189, 248, 0.3)',
+                            fontWeight: 600,
+                          }}
+                        />
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary' }}>
+                      <LinkedInIcon fontSize="small" /> LinkedIn: Not available
                     </Typography>
                   )}
+                </Box>
+
+                {/* Official Website */}
+                <Box sx={{ mb: 2.5 }}>
+                  {detailData.website ? (
+                    <Link
+                      href={detailData.website}
+                      target="_blank"
+                      underline="hover"
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        color: '#38bdf8',
+                        fontWeight: 600,
+                        fontSize: '0.95rem',
+                      }}
+                    >
+                      <WebIcon fontSize="small" /> Official Website
+                    </Link>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      Website: Not available
+                    </Typography>
+                  )}
+                </Box>
+
+                {/* StartupTN Profile URL */}
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                    StartupTN Profile URL
+                  </Typography>
+                  <Link
+                    href={detailData.profile_url || `https://startuptn.in/ecosystem-info?userid=${detailData.id}`}
+                    target="_blank"
+                    underline="hover"
+                    variant="body2"
+                    sx={{ color: '#38bdf8', wordBreak: 'break-all', fontWeight: 500 }}
+                  >
+                    {detailData.profile_url || `https://startuptn.in/ecosystem-info?userid=${detailData.id}`}
+                  </Link>
                 </Box>
               </Grid>
             </Grid>

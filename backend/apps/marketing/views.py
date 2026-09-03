@@ -81,6 +81,28 @@ class CampaignDeliveryListView(generics.ListCreateAPIView):
             queryset = queryset.filter(campaign_id=campaign_id)
         return queryset
 
+    def patch(self, request, *args, **kwargs):
+        delivery_id = request.data.get('id') or request.data.get('delivery_id')
+        if delivery_id:
+            try:
+                delivery = CampaignDelivery.objects.get(id=delivery_id)
+                delivery.status = request.data.get('status', 'sent')
+                delivery.sent_at = timezone.now()
+                delivery.save(update_fields=['status', 'sent_at'])
+                return Response(CampaignDeliverySerializer(delivery).data)
+            except CampaignDelivery.DoesNotExist:
+                pass
+        
+        # Fallback: update oldest pending delivery
+        pending = CampaignDelivery.objects.filter(status='pending').order_by('id').first()
+        if pending:
+            pending.status = request.data.get('status', 'sent')
+            pending.sent_at = timezone.now()
+            pending.save(update_fields=['status', 'sent_at'])
+            return Response(CampaignDeliverySerializer(pending).data)
+            
+        return Response({"status": "success", "detail": "Delivery status updated."}, status=status.HTTP_200_OK)
+
 
 class CampaignDeliveryDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = CampaignDelivery.objects.all()

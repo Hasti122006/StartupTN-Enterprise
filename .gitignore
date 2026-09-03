@@ -19,6 +19,8 @@ dist/
 db.sqlite3
 .env
 *.log
+.runtime/
+backend/.runtime/
 
 # IDEs
 .vscode/

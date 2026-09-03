@@ -30,23 +30,16 @@ class CompanyListView(generics.ListAPIView):
         total = queryset.count()
         total_pages = math.ceil(total / page_size) if total > 0 else 1
 
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return Response({
-                'total': total,
-                'page': page_num,
-                'page_size': page_size,
-                'total_pages': total_pages,
-                'items': serializer.data,
-            })
+        start = (page_num - 1) * page_size
+        end = start + page_size
+        items = queryset[start:end]
 
-        serializer = self.get_serializer(queryset, many=True)
+        serializer = self.get_serializer(items, many=True)
         return Response({
             'total': total,
-            'page': 1,
-            'page_size': total,
-            'total_pages': 1,
+            'page': page_num,
+            'page_size': page_size,
+            'total_pages': total_pages,
             'items': serializer.data,
         })
 

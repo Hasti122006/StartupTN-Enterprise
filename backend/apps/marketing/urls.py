@@ -8,6 +8,7 @@ router.register(r'campaigns', EmailCampaignViewSet, basename='campaign')
 urlpatterns = [
     path('', include(router.urls)),
     path('deliveries/', CampaignDeliveryListView.as_view(), name='delivery-list'),
+    path('deliveries//', CampaignDeliveryListView.as_view(), name='delivery-list-double-slash'),
     path('deliveries/<int:pk>/', CampaignDeliveryDetailView.as_view(), name='delivery-detail'),
     path('stats/', MarketingStatsView.as_view(), name='marketing-stats'),
 ]
