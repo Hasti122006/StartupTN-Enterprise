@@ -82,7 +82,11 @@ class ScraperAuthStatusView(APIView):
         storage_state = getattr(settings, 'STARTUPTN_STORAGE_STATE', os.getenv('STARTUPTN_STORAGE_STATE', '.runtime/startuptn-auth-state.json'))
         state_path = Path(storage_state)
         if not state_path.is_absolute():
-            state_path = Path(settings.BASE_DIR) / state_path
+            candidate = Path(settings.BASE_DIR) / state_path
+            if not candidate.exists() and (Path(settings.BASE_DIR).parent / state_path).exists():
+                state_path = Path(settings.BASE_DIR).parent / state_path
+            else:
+                state_path = candidate
 
         # A Playwright storage-state file may contain only analytics/preferences.
         # Treating its mere existence as an authenticated StartupTN session lets the
